@@ -12,9 +12,41 @@ from aiohttp import TCPConnector
 
 spell = SpellChecker()
 
-@click.group()
-def cli():
-    pass
+@click.command()
+@click.argument('mode', type=click.Choice(['synchroon', 'asynchroon'], case_sensitive=False))
+@click.argument('max_diepte', type=int)
+@click.argument('url')
+def main(mode, max_diepte, url):
+    click.echo(f"Je hebt gekozen voor de modus: {mode}")
+    click.echo(f"De maximale diepte is ingesteld op: {max_diepte}")
+    click.echo(f"De ingevoerde URL is: {url}")
+
+    if mode == 'synchroon':
+        click.echo("Werken in synchrone modus...")
+        synchronous(url, max_diepte)
+    else:
+        click.echo("Werken in asynchrone modus...")
+        asyncio.run(asynchronous_search(url, max_diepte))
+
+def synchronous(url, max_depth):
+    counter = Counter()
+    visited = set()
+    visit_page(url, counter, visited, max_depth)
+    print("Woordfrequenties over alle pagina's:")
+    print(counter.most_common(25))
+
+
+async def asynchronous_search(url, max_depth):
+    counter = Counter()
+    visited = set()
+    ssl_context = ssl.create_default_context(cafile=certifi.where())
+
+    async with aiohttp.ClientSession(connector=TCPConnector(ssl=ssl_context)) as session:
+        await async_visit_page(session, url, counter, visited, max_depth)
+
+    print("Woordfrequenties over alle pagina's:")
+    print(counter.most_common(25))
+
 
 def visit_page(url, counter, visited, max_depth, depth=0):
     if depth > max_depth:
@@ -70,34 +102,7 @@ async def async_visit_page(session, url, counter, visited, max_depth, depth=0):
         print(f"Fout bij het bezoeken van {url}: {e}")
 
 
-@cli.command()
-@click.argument("url")
-@click.argument("max_depth", type=int)
-def synchronous(url, max_depth):
-    counter = Counter()
-    visited = set()
-    visit_page(url, counter, visited, max_depth)
-    print("Woordfrequenties over alle pagina's:")
-    print(counter.most_common(25))
+if __name__ == '__main__':
+    main()
 
 
-async def asynchronous_search(url, max_depth):
-    counter = Counter()
-    visited = set()
-    ssl_context = ssl.create_default_context(cafile=certifi.where())
-
-    async with aiohttp.ClientSession(connector=TCPConnector(ssl=ssl_context)) as session:
-        await async_visit_page(session, url, counter, visited, max_depth)
-
-    print("Woordfrequenties over alle pagina's:")
-    print(counter.most_common(25))
-
-
-@cli.command()
-@click.argument("url")
-@click.argument("max_depth", type=int)
-def asynchronous(url, max_depth):
-    asyncio.run(asynchronous_search(url, max_depth))
-
-if __name__ == "__main__":
-    cli()
